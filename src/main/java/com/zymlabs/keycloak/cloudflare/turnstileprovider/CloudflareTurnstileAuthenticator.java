@@ -61,6 +61,8 @@ public class CloudflareTurnstileAuthenticator extends AbstractUsernameFormAuthen
     public static final String CONFIG_ENABLE_DEBUG_LOGGING = "enableDebugLogging";
     public static final String CONFIG_IMPLEMENTATION_METHOD = "implementationMethod";
     public static final String CONFIG_ALLOWLIST_BEHAVIOR = "allowlistBehavior";
+    public static final String CONFIG_EXPECTED_HOSTNAMES = "expectedHostnames";
+    public static final String CONFIG_EXPECTED_ACTION = "expectedAction";
 
     // Implementation methods
     private static final String METHOD_SEPARATE_PAGE = "SEPARATE_PAGE";
@@ -177,7 +179,8 @@ public class CloudflareTurnstileAuthenticator extends AbstractUsernameFormAuthen
                 break;
             case METHOD_SEPARATE_PAGE:
             default:
-                displaySeparatePage(context, siteKey, widgetAppearance, widgetTheme, enableDebugLogging, isRegistrationFlow);
+                displaySeparatePage(context, siteKey, widgetAppearance, widgetTheme, configMap.get(CONFIG_EXPECTED_ACTION),
+                        enableDebugLogging, isRegistrationFlow);
                 break;
         }
     }
@@ -189,7 +192,8 @@ public class CloudflareTurnstileAuthenticator extends AbstractUsernameFormAuthen
         form.addScript(CloudflareTurnstileHelper.buildConfigJsUrl(context.getUriInfo(), realmName, providerId,
                 configMap.get(CONFIG_SITE_KEY), WidgetAppearance.fromConfig(configMap.get(CONFIG_WIDGET_APPEARANCE)).value(),
                 configMap.getOrDefault(CONFIG_WIDGET_THEME, "auto"),
-                Boolean.parseBoolean(configMap.getOrDefault(CONFIG_ENABLE_DEBUG_LOGGING, "false"))));
+                Boolean.parseBoolean(configMap.getOrDefault(CONFIG_ENABLE_DEBUG_LOGGING, "false")),
+                configMap.get(CONFIG_EXPECTED_ACTION)));
         form.addScript(CloudflareTurnstileHelper.buildInjectorJsUrl(context.getUriInfo(), realmName, providerId));
     }
 
@@ -198,7 +202,7 @@ public class CloudflareTurnstileAuthenticator extends AbstractUsernameFormAuthen
      * Shows only the Turnstile widget, then proceeds to the sign-in, registration or reset-password form.
      */
     private void displaySeparatePage(AuthenticationFlowContext context, String siteKey, WidgetAppearance widgetAppearance,
-                                     String widgetTheme, boolean enableDebugLogging, boolean isRegistrationFlow) {
+                                     String widgetTheme, String widgetAction, boolean enableDebugLogging, boolean isRegistrationFlow) {
         String template = isRegistrationFlow ? "turnstile-registration-form.ftl" : "turnstile-form.ftl";
 
         LoginFormsProvider form = context.form();
@@ -206,6 +210,7 @@ public class CloudflareTurnstileAuthenticator extends AbstractUsernameFormAuthen
         Response challenge = form
                 .setAttribute("turnstileSiteKey", siteKey)
                 .setAttribute("turnstileTheme", widgetTheme)
+                .setAttribute("turnstileAction", widgetAction)
                 .setAttribute("isRegistrationFlow", isRegistrationFlow)
                 .setAttribute("isResetFlow", isResetCredentialsFlow(context))
                 .setAttribute("enableDebugLogging", enableDebugLogging)
@@ -236,7 +241,7 @@ public class CloudflareTurnstileAuthenticator extends AbstractUsernameFormAuthen
      * The widget on the sign-in page: with script injection, the scripts; with the custom theme, the
      * attributes the theme's template reads (script injection sets them too, for themes that check).
      */
-    private static Consumer<LoginFormsProvider> signInWidget(AuthenticationFlowContext context, Map<String, String> configMap,
+    static Consumer<LoginFormsProvider> signInWidget(AuthenticationFlowContext context, Map<String, String> configMap,
                                                             String implementationMethod) {
         boolean scriptInjection = METHOD_SCRIPT_INJECTION.equals(implementationMethod);
         return form -> {
@@ -244,6 +249,7 @@ public class CloudflareTurnstileAuthenticator extends AbstractUsernameFormAuthen
                     .setAttribute("turnstileSkipped", false)
                     .setAttribute("turnstileSiteKey", configMap.get(CONFIG_SITE_KEY))
                     .setAttribute("turnstileTheme", configMap.getOrDefault(CONFIG_WIDGET_THEME, "auto"))
+                    .setAttribute("turnstileAction", configMap.get(CONFIG_EXPECTED_ACTION))
                     .setAttribute("enableDebugLogging", Boolean.parseBoolean(configMap.getOrDefault(CONFIG_ENABLE_DEBUG_LOGGING, "false")));
             WidgetAppearance.fromConfig(configMap.get(CONFIG_WIDGET_APPEARANCE)).setAttributes(form);
             if (scriptInjection) {
@@ -468,7 +474,7 @@ public class CloudflareTurnstileAuthenticator extends AbstractUsernameFormAuthen
         int readTimeout = CloudflareTurnstileHelper.getReadTimeout(attempt.settings());
         try (CloudflareTurnstileService service = new CloudflareTurnstileService(attempt.settings().get(CONFIG_SECRET_KEY),
                 connectTimeout, readTimeout)) {
-            return service.verify(token, attempt.ipAddress());
+            return CloudflareTurnstileValidator.checkExpected(service.verify(token, attempt.ipAddress()), attempt.settings());
         }
     }
 

@@ -696,4 +696,17 @@ class CloudflareTurnstileHelperTest {
         assertThat(CloudflareTurnstileHelper.buildInjectorJsUrl(null, "myrealm", "cloudflare-turnstile"))
                 .endsWith("turnstile-injector.js?v=" + version);
     }
+
+    @Test
+    @DisplayName("buildConfigJsUrl should add the widget's action only when one is set")
+    void testBuildConfigJsUrl_WithAction() {
+        String url = CloudflareTurnstileHelper.buildConfigJsUrl(
+                null, "myrealm", "cloudflare-turnstile", "sitekey123", "always", "auto", false, "signup");
+
+        assertThat(url).isEqualTo("/realms/myrealm/cloudflare-turnstile/config.js?siteKey=sitekey123&mode=always&theme=auto&debug=false&action=signup");
+        assertThat(CloudflareTurnstileHelper.buildConfigJsUrl(
+                null, "myrealm", "cloudflare-turnstile", "sitekey123", "always", "auto", false, null))
+                .isEqualTo(CloudflareTurnstileHelper.buildConfigJsUrl(
+                        null, "myrealm", "cloudflare-turnstile", "sitekey123", "always", "auto", false));
+    }
 }

@@ -50,7 +50,7 @@ public class CloudflareTurnstileRealmSettingsTab implements UiTabProvider, UiTab
     @Override
     public List<ProviderConfigProperty> getConfigProperties() {
         return new CloudflareTurnstileAuthenticatorFactory().getConfigProperties().stream()
-                .filter(p -> !CloudflareTurnstileAuthenticator.CONFIG_IMPLEMENTATION_METHOD.equals(p.getName())
+                .filter(p -> !CloudflareTurnstileRealmSettings.STEP_SETTINGS.contains(p.getName())
                         && !CloudflareTurnstileRealmSettings.CONFIG_USE_REALM_SETTINGS.equals(p.getName()))
                 .toList();
     }

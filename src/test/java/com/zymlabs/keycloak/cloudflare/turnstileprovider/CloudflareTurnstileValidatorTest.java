@@ -390,4 +390,92 @@ class CloudflareTurnstileValidatorTest {
 
         assertThat(config).isEmpty();
     }
+
+    // ===== EXPECTED HOSTNAMES AND ACTION =====
+
+    private static CloudflareTurnstileService.TurnstileVerificationResult solved(String hostname, String action) {
+        return new CloudflareTurnstileService.TurnstileVerificationResult(true, null, "2024-01-01T12:00:00Z", hostname, action,
+                "{\"success\":true}");
+    }
+
+    private static CloudflareTurnstileValidator.ValidationResult validate(
+            CloudflareTurnstileService.TurnstileVerificationResult answer, Map<String, String> overrides) {
+        CloudflareTurnstileService service = mock(CloudflareTurnstileService.class);
+        when(service.verify("test-token", "8.8.8.8")).thenReturn(answer);
+        return CloudflareTurnstileValidator.validateTurnstile("test-token", "8.8.8.8", TestUtils.configWith(overrides), service);
+    }
+
+    @Test
+    @DisplayName("validateTurnstile should reject a token solved on a hostname not expected, like a rejected token")
+    void testValidateTurnstile_HostnameMismatch() {
+        CloudflareTurnstileValidator.ValidationResult result = validate(solved("localhost", null),
+                Map.of(CloudflareTurnstileAuthenticator.CONFIG_EXPECTED_HOSTNAMES, "login.example.com"));
+
+        assertThat(result.isSuccess()).isFalse();
+        assertThat(result.getErrorCode()).isEqualTo("verification_failed");
+        assertThat(result.getErrorMessage()).isEqualTo("turnstileVerificationFailed");
+    }
+
+    @Test
+    @DisplayName("validateTurnstile should accept a listed hostname (trimmed, any case)")
+    void testValidateTurnstile_HostnameListed() {
+        CloudflareTurnstileValidator.ValidationResult result = validate(solved("Login.Example.com", null),
+                Map.of(CloudflareTurnstileAuthenticator.CONFIG_EXPECTED_HOSTNAMES, "localhost, login.example.com "));
+
+        assertThat(result.isSuccess()).isTrue();
+    }
+
+    @Test
+    @DisplayName("validateTurnstile should reject a token solved for another action, like a rejected token")
+    void testValidateTurnstile_ActionMismatch() {
+        CloudflareTurnstileValidator.ValidationResult result = validate(solved("login.example.com", "login"),
+                Map.of(CloudflareTurnstileAuthenticator.CONFIG_EXPECTED_ACTION, "signup"));
+
+        assertThat(result.isSuccess()).isFalse();
+        assertThat(result.getErrorCode()).isEqualTo("verification_failed");
+        assertThat(result.getErrorMessage()).isEqualTo("turnstileVerificationFailed");
+    }
+
+    @Test
+    @DisplayName("validateTurnstile should accept the expected action and hostname")
+    void testValidateTurnstile_ActionAndHostnameMatch() {
+        CloudflareTurnstileService.TurnstileVerificationResult answer = solved("login.example.com", "signup");
+        CloudflareTurnstileValidator.ValidationResult result = validate(answer, Map.of(
+                CloudflareTurnstileAuthenticator.CONFIG_EXPECTED_HOSTNAMES, "login.example.com",
+                CloudflareTurnstileAuthenticator.CONFIG_EXPECTED_ACTION, "signup"));
+
+        assertThat(result.isSuccess()).isTrue();
+        assertThat(result.getVerificationResult()).isSameAs(answer);
+    }
+
+    @Test
+    @DisplayName("checkExpected should leave answers alone without expectations, or when Cloudflare already rejected them")
+    void testCheckExpected_Unset() {
+        CloudflareTurnstileService.TurnstileVerificationResult answer = solved("anywhere.example", "anything");
+        CloudflareTurnstileService.TurnstileVerificationResult rejected = TestUtils.failureResult();
+
+        assertThat(CloudflareTurnstileValidator.checkExpected(answer, TestUtils.defaultConfig())).isSameAs(answer);
+        assertThat(CloudflareTurnstileValidator.checkExpected(answer, Map.of(
+                CloudflareTurnstileAuthenticator.CONFIG_EXPECTED_HOSTNAMES, " ",
+                CloudflareTurnstileAuthenticator.CONFIG_EXPECTED_ACTION, ""))).isSameAs(answer);
+        assertThat(CloudflareTurnstileValidator.checkExpected(rejected, Map.of(
+                CloudflareTurnstileAuthenticator.CONFIG_EXPECTED_ACTION, "signup"))).isSameAs(rejected);
+    }
+
+    @Test
+    @DisplayName("checkExpected should fail a mismatch with its own error code, keeping Cloudflare's answer")
+    void testCheckExpected_ErrorCodes() {
+        CloudflareTurnstileService.TurnstileVerificationResult hostname = CloudflareTurnstileValidator.checkExpected(
+                solved(null, "signup"), Map.of(CloudflareTurnstileAuthenticator.CONFIG_EXPECTED_HOSTNAMES, "login.example.com"));
+        CloudflareTurnstileService.TurnstileVerificationResult action = CloudflareTurnstileValidator.checkExpected(
+                solved("login.example.com", null), Map.of(CloudflareTurnstileAuthenticator.CONFIG_EXPECTED_ACTION, "signup"));
+
+        assertThat(hostname.isSuccess()).isFalse();
+        assertThat(hostname.getErrorCodes()).isEqualTo("hostname-mismatch");
+        assertThat(hostname.getAction()).isEqualTo("signup");
+        assertThat(action.isSuccess()).isFalse();
+        assertThat(action.getErrorCodes()).isEqualTo("action-mismatch");
+        assertThat(action.getHostname()).isEqualTo("login.example.com");
+        assertThat(action.getRawResponse()).isEqualTo("{\"success\":true}");
+    }
 }

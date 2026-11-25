@@ -315,4 +315,28 @@ class CloudflareTurnstileServiceTest {
         assertThat(str).contains("success=true");
         // Should not throw NPE with null fields
     }
+
+    // ===== TOKEN LENGTH AND ACTION =====
+
+    @Test
+    @DisplayName("verify should refuse a token longer than 2048 characters without asking Cloudflare")
+    void verifyRefusesOverlongTokenWithoutAskingCloudflare() {
+        // Asking Cloudflare would throw: nothing can connect within a millisecond
+        try (CloudflareTurnstileService service = new CloudflareTurnstileService("secret", 1, 1)) {
+            CloudflareTurnstileService.TurnstileVerificationResult result = service.verify("x".repeat(2049), "1.2.3.4");
+
+            assertThat(result.isSuccess()).isFalse();
+            assertThat(result.getErrorCodes()).isEqualTo("invalid-input-response");
+            assertThatThrownBy(() -> service.verify("x".repeat(2048), "1.2.3.4"))
+                    .isInstanceOf(CloudflareTurnstileService.UnavailableException.class);
+        }
+    }
+
+    @Test
+    @DisplayName("TurnstileVerificationResult should carry the action, none for the former constructor")
+    void testVerificationResultAction() {
+        assertThat(new CloudflareTurnstileService.TurnstileVerificationResult(true, null, null, "example.com", "signup", "{}")
+                .getAction()).isEqualTo("signup");
+        assertThat(TestUtils.successResult().getAction()).isNull();
+    }
 }

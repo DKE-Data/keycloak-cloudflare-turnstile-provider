@@ -117,6 +117,8 @@ All configuration is stored in Keycloak's database and accessed via `Authenticat
 - `connectTimeout` - milliseconds
 - `readTimeout` - milliseconds
 - `enableDebugLogging` - boolean, enable JavaScript console logging
+- `expectedHostnames` - comma-separated hostnames Cloudflare must report (empty: no check)
+- `expectedAction` - the widget's `data-action`, which Cloudflare must report (empty: no check); a step setting like `implementationMethod`
 
 ### Database Schema
 

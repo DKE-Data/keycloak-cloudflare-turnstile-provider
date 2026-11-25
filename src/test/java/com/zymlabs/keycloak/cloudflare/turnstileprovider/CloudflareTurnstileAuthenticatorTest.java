@@ -14,6 +14,7 @@ import java.util.Map;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.RETURNS_SELF;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
@@ -129,5 +130,16 @@ class CloudflareTurnstileAuthenticatorTest {
                 .isInstanceOf(IllegalStateException.class).hasMessage("boom");
         assertThatThrownBy(() -> CloudflareTurnstileAuthenticator.withWidgetOnItsPage(context, f -> { }).getUser())
                 .isInstanceOf(IllegalStateException.class).hasMessage("boom");
+    }
+
+    @Test
+    void theSignInWidgetCarriesTheExpectedAction() {
+        LoginFormsProvider form = mock(LoginFormsProvider.class, RETURNS_SELF);
+
+        CloudflareTurnstileAuthenticator.signInWidget(inFlow("authenticate"), Map.of(
+                CloudflareTurnstileAuthenticator.CONFIG_SITE_KEY, "site",
+                CloudflareTurnstileAuthenticator.CONFIG_EXPECTED_ACTION, "login"), "CUSTOM_THEME").accept(form);
+
+        verify(form).setAttribute("turnstileAction", "login");
     }
 }

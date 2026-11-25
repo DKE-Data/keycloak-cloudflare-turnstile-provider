@@ -38,4 +38,14 @@ class CloudflareTurnstileResourceProviderTest {
         assertThat(CloudflareTurnstileResourceProvider.configScript("key", "managed", "auto", "false"))
                 .contains("window.TURNSTILE_CONFIG.mode = \"always\";");
     }
+
+    @Test
+    @DisplayName("config.js gives the injector the widget's action only when one is set")
+    void configScriptAction() {
+        assertThat(CloudflareTurnstileResourceProvider.configScript("key", "always", "auto", "false", " signup "))
+                .contains("window.TURNSTILE_CONFIG.action = \"signup\";\n");
+        assertThat(CloudflareTurnstileResourceProvider.configScript("key", "always", "auto", "false", ""))
+                .doesNotContain("action")
+                .isEqualTo(CloudflareTurnstileResourceProvider.configScript("key", "always", "auto", "false"));
+    }
 }

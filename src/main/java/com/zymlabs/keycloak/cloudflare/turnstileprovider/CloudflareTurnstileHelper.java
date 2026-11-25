@@ -476,11 +476,24 @@ public class CloudflareTurnstileHelper {
     public static String buildConfigJsUrl(UriInfo uriInfo, String realmName, String providerId,
                                            String siteKey, String widgetMode, String widgetTheme,
                                            boolean enableDebugLogging) {
+        return buildConfigJsUrl(uriInfo, realmName, providerId, siteKey, widgetMode, widgetTheme, enableDebugLogging, null);
+    }
+
+    /**
+     * Builds the URL for the Turnstile config.js endpoint with the widget's action.
+     *
+     * @param widgetAction the widget's {@code data-action} (the expected action); none when empty
+     * @return the full URL path for config.js
+     */
+    public static String buildConfigJsUrl(UriInfo uriInfo, String realmName, String providerId,
+                                           String siteKey, String widgetMode, String widgetTheme,
+                                           boolean enableDebugLogging, String widgetAction) {
         String contextPath = getContextPath(uriInfo);
         return String.format("%s/realms/%s/%s/config.js?siteKey=%s&mode=%s&theme=%s&debug=%s",
                 contextPath, realmName, providerId,
                 urlEncode(siteKey), urlEncode(widgetMode), urlEncode(widgetTheme),
-                enableDebugLogging ? "true" : "false");
+                enableDebugLogging ? "true" : "false")
+                + (widgetAction == null || widgetAction.isBlank() ? "" : "&action=" + urlEncode(widgetAction.trim()));
     }
 
     /**

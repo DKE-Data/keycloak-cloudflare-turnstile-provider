@@ -72,12 +72,13 @@ public class CloudflareTurnstileResourceProvider implements RealmResourceProvide
     /**
      * Serves dynamically generated Turnstile configuration script.
      *
-     * GET /realms/{realm}/cloudflare-turnstile/config.js?siteKey=xxx&mode=always&theme=auto&debug=false
+     * GET /realms/{realm}/cloudflare-turnstile/config.js?siteKey=xxx&mode=always&theme=auto&debug=false[&action=signup]
      *
      * @param siteKey Cloudflare Turnstile site key
      * @param mode Widget appearance (always, interaction-only, invisible; or the former managed, non-interactive)
      * @param theme Widget theme (light, dark, auto)
      * @param debug Enable JavaScript console debug logging
+     * @param action The widget's action (data-action); none when empty
      * @return Response with JavaScript that sets global config variables
      */
     @GET
@@ -87,7 +88,8 @@ public class CloudflareTurnstileResourceProvider implements RealmResourceProvide
             @QueryParam("siteKey") String siteKey,
             @QueryParam("mode") String mode,
             @QueryParam("theme") String theme,
-            @QueryParam("debug") String debug) {
+            @QueryParam("debug") String debug,
+            @QueryParam("action") String action) {
 
         logger.debugf("Serving Turnstile config: siteKey=%s, mode=%s, theme=%s, debug=%s",
                      siteKey != null ? "***" : "null", mode, theme, debug);
@@ -101,7 +103,7 @@ public class CloudflareTurnstileResourceProvider implements RealmResourceProvide
                     .build();
         }
 
-        return Response.ok(configScript(siteKey, mode, theme, debug))
+        return Response.ok(configScript(siteKey, mode, theme, debug, action))
                 .header("Content-Type", "application/javascript; charset=UTF-8")
                 .header("Cache-Control", "no-cache, no-store, must-revalidate") // Don't cache config
                 .build();
@@ -109,6 +111,11 @@ public class CloudflareTurnstileResourceProvider implements RealmResourceProvide
 
     /** The config.js script: sets the widget settings as global variables. */
     static String configScript(String siteKey, String mode, String theme, String debug) {
+        return configScript(siteKey, mode, theme, debug, null);
+    }
+
+    /** The config.js script, with the widget's action when one is set. */
+    static String configScript(String siteKey, String mode, String theme, String debug, String action) {
         // Use defaults if not specified
         String widgetMode = WidgetAppearance.fromConfig(mode).value();
         String widgetTheme = (theme != null && !theme.trim().isEmpty()) ? theme : "auto";
@@ -123,13 +130,15 @@ public class CloudflareTurnstileResourceProvider implements RealmResourceProvide
                 "window.TURNSTILE_CONFIG.siteKey = %s;\n" +
                 "window.TURNSTILE_CONFIG.mode = %s;\n" +
                 "window.TURNSTILE_CONFIG.theme = %s;\n" +
+                "%s" +
                 (enableDebugLogging ? "console.log('[Turnstile Config] Configuration loaded:', window.TURNSTILE_CONFIG);\n" : "") +
                 // Tells an injector that ran first: themes that add these scripts with JavaScript run them in any order
                 "document.dispatchEvent(new Event('cloudflare-turnstile:config'));\n",
                 enableDebugLogging ? "true" : "false",
                 escapeJavaScriptString(siteKey),
                 escapeJavaScriptString(widgetMode),
-                escapeJavaScriptString(widgetTheme)
+                escapeJavaScriptString(widgetTheme),
+                action == null || action.isBlank() ? "" : "window.TURNSTILE_CONFIG.action = " + escapeJavaScriptString(action.trim()) + ";\n"
         );
     }
 

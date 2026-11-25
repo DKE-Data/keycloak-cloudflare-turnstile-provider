@@ -8,6 +8,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Hostname and action checks** (Cloudflare's recommended server-side checks), off unless set:
+  `expectedHostnames` (comma-separated) refuses tokens Cloudflare reports for another hostname, and
+  `expectedAction` renders the widget with that `data-action` (every implementation method) and refuses
+  tokens for another action. A mismatch fails like a token Cloudflare rejects, with the error code
+  `hostname-mismatch` or `action-mismatch`. `expectedAction` belongs to each step, also one using the
+  realm's settings. Tokens longer than 2048 characters are refused without asking Cloudflare.
 - **Generated docs screenshots:** `docs/images/` (with `manifest.json` and the `docs/screens.md`
   gallery) is taken by the `docs-screens` Playwright project (`npm run docs-screens` in `e2e/`): sign-in,
   registration and reset pages with each implementation method, refusals, a phone-sized sign-in and the
@@ -32,6 +38,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   compose file now includes Mailpit for Keycloak's emails and turns on `declarative-ui`.
 
 ### Changed
+- Log lines with a client IP address are logged at DEBUG instead of INFO.
 - **"Widget Mode" is now "Widget Appearance", stored as `widgetAppearance`, with values named for what
   they do**: `always` (formerly `managed`), `interaction-only` (formerly `non-interactive`) and
   `invisible`. The setting only ever set Cloudflare's `appearance`; Cloudflare's own mode (Managed,

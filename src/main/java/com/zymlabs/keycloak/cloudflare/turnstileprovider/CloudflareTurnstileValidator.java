@@ -4,6 +4,7 @@ import org.jboss.logging.Logger;
 import org.keycloak.authentication.AuthenticationFlowContext;
 import org.keycloak.models.AuthenticatorConfigModel;
 
+import java.util.Arrays;
 import java.util.Map;
 
 /**
@@ -71,7 +72,7 @@ public class CloudflareTurnstileValidator {
         try {
             boolean isAllowed = IpAddressUtils.isIpInList(ipAddress, ipAllowlist);
             if (isAllowed) {
-                logger.infof("IP %s is in allowlist, skipping Turnstile verification", ipAddress);
+                logger.debugf("IP %s is in allowlist, skipping Turnstile verification", ipAddress);
             }
             return isAllowed;
         } catch (Exception e) {
@@ -138,22 +139,23 @@ public class CloudflareTurnstileValidator {
         if (isIpAllowed(ipAddress, ipAllowlist)) {
             if ("SKIP_VERIFICATION".equals(allowlistBehavior)) {
                 // SKIP_VERIFICATION mode: Don't make API call, return synthetic success
-                logger.infof("IP %s in allowlist with SKIP_VERIFICATION - bypassing Cloudflare API call", ipAddress);
+                logger.debugf("IP %s in allowlist with SKIP_VERIFICATION - bypassing Cloudflare API call", ipAddress);
                 CloudflareTurnstileService.TurnstileVerificationResult allowlistResult =
                         new CloudflareTurnstileService.TurnstileVerificationResult(
                                 true, null, null, null, "{\"success\":true,\"allowlist\":true}");
                 return ValidationResult.success(allowlistResult);
             }
             // VERIFY_BUT_ALLOW mode: Continue to actual Cloudflare API call below
-            logger.infof("IP %s in allowlist with VERIFY_BUT_ALLOW - will verify with Cloudflare API", ipAddress);
+            logger.debugf("IP %s in allowlist with VERIFY_BUT_ALLOW - will verify with Cloudflare API", ipAddress);
         }
 
         // Verify with Cloudflare
         try {
-            CloudflareTurnstileService.TurnstileVerificationResult result = service.verify(turnstileResponse, ipAddress);
+            CloudflareTurnstileService.TurnstileVerificationResult result =
+                    checkExpected(service.verify(turnstileResponse, ipAddress), config);
 
             if (result.isSuccess()) {
-                logger.infof("Turnstile verification successful for IP %s", ipAddress);
+                logger.debugf("Turnstile verification successful for IP %s", ipAddress);
                 return ValidationResult.success(result);
             } else {
                 logger.warnf("Turnstile verification failed for IP %s: %s", ipAddress, result.getErrorCodes());
@@ -175,6 +177,38 @@ public class CloudflareTurnstileValidator {
                 return ValidationResult.failure("verification_error", "turnstileVerificationError");
             }
         }
+    }
+
+    /**
+     * Cloudflare's answer, failed when it was solved on a hostname other than the expected ones
+     * ({@code expectedHostnames}) or for another action ({@code expectedAction}). Unset expectations
+     * check nothing. A failed answer reads like Cloudflare's own {@code success: false}, with the
+     * error code {@code hostname-mismatch} or {@code action-mismatch}.
+     */
+    public static CloudflareTurnstileService.TurnstileVerificationResult checkExpected(
+            CloudflareTurnstileService.TurnstileVerificationResult result, Map<String, String> config) {
+        if (result == null || !result.isSuccess()) {
+            return result;
+        }
+        String hostnames = config.get(CloudflareTurnstileAuthenticator.CONFIG_EXPECTED_HOSTNAMES);
+        if (hostnames != null && !hostnames.isBlank() && Arrays.stream(hostnames.split(","))
+                .map(String::trim)
+                .noneMatch(h -> h.equalsIgnoreCase(result.getHostname()))) {
+            logger.warnf("Turnstile token was solved on hostname %s, expected one of %s", result.getHostname(), hostnames);
+            return mismatch(result, "hostname-mismatch");
+        }
+        String action = config.get(CloudflareTurnstileAuthenticator.CONFIG_EXPECTED_ACTION);
+        if (action != null && !action.isBlank() && !action.trim().equals(result.getAction())) {
+            logger.warnf("Turnstile token was solved for action %s, expected %s", result.getAction(), action);
+            return mismatch(result, "action-mismatch");
+        }
+        return result;
+    }
+
+    private static CloudflareTurnstileService.TurnstileVerificationResult mismatch(
+            CloudflareTurnstileService.TurnstileVerificationResult result, String errorCode) {
+        return new CloudflareTurnstileService.TurnstileVerificationResult(false, errorCode, result.getChallengeTs(),
+                result.getHostname(), result.getAction(), result.getRawResponse());
     }
 
     /**

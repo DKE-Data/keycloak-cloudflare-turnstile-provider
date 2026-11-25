@@ -36,8 +36,12 @@ public final class CloudflareTurnstileRealmSettings {
      */
     public static final String CONFIG_USE_REALM_SETTINGS = "useRealmSettings";
 
-    /** What a step decides even when it takes the realm's settings: how its widget is placed. */
-    private static final Set<String> STEP_SETTINGS = Set.of(CloudflareTurnstileAuthenticator.CONFIG_IMPLEMENTATION_METHOD);
+    /**
+     * What a step decides even when it takes the realm's settings: how its widget is placed, and its
+     * action (one per form, so a token solved for sign-in isn't accepted for registration).
+     */
+    static final Set<String> STEP_SETTINGS = Set.of(CloudflareTurnstileAuthenticator.CONFIG_IMPLEMENTATION_METHOD,
+            CloudflareTurnstileAuthenticator.CONFIG_EXPECTED_ACTION);
 
     private CloudflareTurnstileRealmSettings() {
     }

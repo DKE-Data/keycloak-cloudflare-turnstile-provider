@@ -351,6 +351,7 @@ The Cloudflare Turnstile authenticator provides these variables to your template
 | `turnstileSiteKey` | String | Your Cloudflare site key | `"1x00000000000000000000AA"` |
 | `turnstileTheme` | String | Widget theme | `"light"`, `"dark"`, `"auto"` |
 | `turnstileAppearance` | String | Cloudflare's `appearance` for the widget, from the Widget Appearance setting (`interaction-only` for `invisible`) | `"always"`, `"interaction-only"` |
+| `turnstileAction` | String | The Expected Action setting, for `data-action`; unset when empty. With an Expected Action, a widget without it is refused | `"login"`, `"signup"` |
 | `turnstileInvisible` | Boolean | Widget Appearance is `invisible`: the site key is in Cloudflare's Invisible mode, so don't hold back the submit button | `true`, `false` |
 | `turnstileMode` | String | The Widget Appearance setting under its former names, for themes written against them | `"managed"` (always), `"non-interactive"` (interaction-only), `"invisible"` |
 
@@ -372,6 +373,7 @@ The Turnstile widget supports these Cloudflare data attributes:
 | `data-theme` | Visual theme | `light`, `dark`, `auto` |
 | `data-size` | Widget size | `normal`, `flexible`, `compact` |
 | `data-appearance` | When the widget is visible | `always`, `execute`, `interaction-only` |
+| `data-action` | The action Cloudflare reports back; add `<#if turnstileAction?has_content>data-action="${turnstileAction}"</#if>` | From config |
 
 Cloudflare's widget mode (Managed, Non-Interactive, Invisible) comes from the site key, not from an
 attribute. Don't use `data-size="invisible"`: Cloudflare throws `Invalid value for parameter "size"` when it

@@ -30,6 +30,8 @@ public class CloudflareTurnstileService implements Closeable {
     private static final Logger logger = Logger.getLogger(CloudflareTurnstileService.class);
     private static final String SITEVERIFY_URL = "https://challenges.cloudflare.com/turnstile/v0/siteverify";
     private static final ObjectMapper objectMapper = new ObjectMapper();
+    /** Longest token Cloudflare issues; longer ones are refused without asking Cloudflare. */
+    static final int MAX_TOKEN_LENGTH = 2048;
 
     private final String secretKey;
     private final CloseableHttpClient httpClient;
@@ -80,6 +82,10 @@ public class CloudflareTurnstileService implements Closeable {
             logger.warn("Turnstile token is null or empty");
             return new TurnstileVerificationResult(false, "missing-input-response", null, null, null);
         }
+        if (token.length() > MAX_TOKEN_LENGTH) {
+            logger.warnf("Turnstile token is longer than %d characters", MAX_TOKEN_LENGTH);
+            return new TurnstileVerificationResult(false, "invalid-input-response", null, null, null);
+        }
 
         try {
             HttpPost post = new HttpPost(SITEVERIFY_URL);
@@ -107,6 +113,7 @@ public class CloudflareTurnstileService implements Closeable {
             boolean success = jsonResponse.has("success") && jsonResponse.get("success").asBoolean();
             String challengeTs = jsonResponse.has("challenge_ts") ? jsonResponse.get("challenge_ts").asText() : null;
             String hostname = jsonResponse.has("hostname") ? jsonResponse.get("hostname").asText() : null;
+            String action = jsonResponse.has("action") ? jsonResponse.get("action").asText() : null;
 
             // Extract error codes if present
             String errorCodes = null;
@@ -117,10 +124,10 @@ public class CloudflareTurnstileService implements Closeable {
             }
 
             TurnstileVerificationResult result = new TurnstileVerificationResult(
-                    success, errorCodes, challengeTs, hostname, responseBody);
+                    success, errorCodes, challengeTs, hostname, action, responseBody);
 
             if (success) {
-                logger.infof("Turnstile verification successful for IP: %s, hostname: %s", remoteIp, hostname);
+                logger.debugf("Turnstile verification successful for IP: %s, hostname: %s", remoteIp, hostname);
             } else {
                 logger.warnf("Turnstile verification failed for IP: %s, errors: %s", remoteIp, errorCodes);
             }
@@ -159,14 +166,21 @@ public class CloudflareTurnstileService implements Closeable {
         private final String errorCodes;
         private final String challengeTs;
         private final String hostname;
+        private final String action;
         private final String rawResponse;
 
         public TurnstileVerificationResult(boolean success, String errorCodes, String challengeTs,
                                           String hostname, String rawResponse) {
+            this(success, errorCodes, challengeTs, hostname, null, rawResponse);
+        }
+
+        public TurnstileVerificationResult(boolean success, String errorCodes, String challengeTs,
+                                          String hostname, String action, String rawResponse) {
             this.success = success;
             this.errorCodes = errorCodes;
             this.challengeTs = challengeTs;
             this.hostname = hostname;
+            this.action = action;
             this.rawResponse = rawResponse;
         }
 
@@ -186,14 +200,19 @@ public class CloudflareTurnstileService implements Closeable {
             return hostname;
         }
 
+        /** The widget's action ({@code data-action}) the token was solved for, if any. */
+        public String getAction() {
+            return action;
+        }
+
         public String getRawResponse() {
             return rawResponse;
         }
 
         @Override
         public String toString() {
-            return String.format("TurnstileVerificationResult{success=%s, errorCodes=%s, hostname=%s}",
-                    success, errorCodes, hostname);
+            return String.format("TurnstileVerificationResult{success=%s, errorCodes=%s, hostname=%s, action=%s}",
+                    success, errorCodes, hostname, action);
         }
     }
 }

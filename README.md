@@ -188,6 +188,8 @@ verifying the header and recovering the admin console.
 | **Record Verifications** | Boolean | `true` | Store verification results in database for auditing |
 | **IP Allowlist** | Multi-valued | Empty | IPs/CIDRs to skip verification (e.g., `192.168.1.0/24,10.0.0.1`) |
 | **IP Blocklist** | Multi-valued | Empty | IPs/CIDRs to immediately block (e.g., `1.2.3.4/32`) |
+| **Expected Hostnames** (`expectedHostnames`) | String | Empty | Comma-separated hostnames the widget may be solved on (e.g., `login.example.com`); see [Hostname and Action Checks](#hostname-and-action-checks) |
+| **Expected Action** (`expectedAction`) | String | Empty | The widget's `data-action` (e.g., `login`, `signup`), which Cloudflare must report back; set per step |
 | **Fail Action** | List | `BLOCK` | Action on verification failure: `BLOCK`, `ALLOW`, or `REQUIRE_MFA` |
 | **Fail Mode** | List | `FAIL_CLOSED` | Behavior on API errors: `FAIL_CLOSED` (block) or `FAIL_OPEN` (allow) |
 | **Connect Timeout** | String | `5000` | Connection timeout in milliseconds |
@@ -197,13 +199,13 @@ verifying the header and recovering the admin console.
 
 Instead of repeating keys on every flow step, set them once per realm: **Realm settings →
 Cloudflare Turnstile** (component `cloudflare-turnstile-settings`). The tab has the options above
-except **Implementation Method**, which belongs to each step.
+except **Implementation Method** and **Expected Action**, which belong to each step.
 
 ![Realm-wide settings](docs/images/admin-console/realm-settings.png)
 *Realm settings → Cloudflare Turnstile*
 
 A step created in the admin console has **Use Realm Settings** turned on: it takes everything from
-the tab except its Implementation Method (the console fills in every field's default, so the step's
+the tab except its Implementation Method and Expected Action (the console fills in every field's default, so the step's
 own fields are ignored rather than trusted). Turn the switch off to give a step its own values;
 empty ones then still come from the tab. Steps configured without the switch (in realm JSON, or
 before this version) use their own values the same way. A separate-page step with no configuration
@@ -246,6 +248,24 @@ key's mode.
 
 - **FAIL_CLOSED** (default) - Block authentication if Cloudflare API is unreachable (secure)
 - **FAIL_OPEN** - Allow authentication if Cloudflare API is unreachable (availability over security)
+
+### Hostname and Action Checks
+
+Both are off unless set. With **Expected Hostnames**, a token is accepted only if Cloudflare reports
+one of the listed hostnames (compared without case); with **Expected Action**, the widget is rendered
+with that `data-action` (every implementation method) and a token is accepted only if Cloudflare
+reports the same action, so a token solved on another form doesn't pass. A mismatch is a failed
+verification like a token Cloudflare rejects (same message, Verification Failure Action, events and
+records); its error code, `hostname-mismatch` or `action-mismatch`, appears in the log and wherever
+Cloudflare's own error codes do (`cloudflare_turnstile_errors`). Tokens longer than 2048 characters
+are refused without asking Cloudflare (`invalid-input-response`).
+
+```json
+"authenticatorConfig": [{
+  "alias": "turnstile-registration",
+  "config": { "expectedHostnames": "login.example.com", "expectedAction": "signup" }
+}]
+```
 
 ## Usage Examples
 

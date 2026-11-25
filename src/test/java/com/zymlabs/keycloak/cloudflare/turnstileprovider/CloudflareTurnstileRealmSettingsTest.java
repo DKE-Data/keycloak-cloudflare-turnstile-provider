@@ -138,4 +138,20 @@ class CloudflareTurnstileRealmSettingsTest {
         }
         assertThat(messages.getProperty(CloudflareTurnstileRealmSettings.TAB_ID)).isEqualTo("Cloudflare Turnstile");
     }
+
+    @Test
+    void aStepUsingTheRealmsSettingsKeepsItsActionButTakesTheRealmsHostnames() {
+        tab.putSingle("expectedHostnames", "login.example.com");
+        tab.putSingle("expectedAction", "login");
+        AuthenticatorConfigModel step = new AuthenticatorConfigModel();
+        step.setConfig(new HashMap<>(Map.of("useRealmSettings", "true", "expectedAction", "signup", "expectedHostnames", "localhost")));
+
+        assertThat(CloudflareTurnstileRealmSettings.effective(null, realm, step))
+                .containsEntry("expectedAction", "signup")
+                .containsEntry("expectedHostnames", "login.example.com");
+        assertThat(new CloudflareTurnstileRealmSettingsTab().getConfigProperties())
+                .extracting(p -> p.getName())
+                .contains("expectedHostnames")
+                .doesNotContain("expectedAction");
+    }
 }

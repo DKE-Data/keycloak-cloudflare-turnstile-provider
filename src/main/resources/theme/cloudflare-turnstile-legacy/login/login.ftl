@@ -90,6 +90,7 @@
                                        data-theme="${turnstileTheme!'auto'}"
                                        data-size="flexible"
                                        data-appearance="${turnstileAppearance!'always'}"
+                                       <#if turnstileAction?has_content>data-action="${turnstileAction}"</#if>
                                        <#if !(turnstileInvisible!false)>
                                        data-callback="onTurnstileSuccess"
                                        data-error-callback="onTurnstileError"

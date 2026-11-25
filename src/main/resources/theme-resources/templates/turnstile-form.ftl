@@ -19,6 +19,7 @@
                          data-theme="${turnstileTheme}"
                          data-size="flexible"
                          data-appearance="${turnstileAppearance!'always'}"
+                         <#if turnstileAction?has_content>data-action="${turnstileAction}"</#if>
                          data-callback="onTurnstileSuccess"
                          <#if !(turnstileInvisible!false)>
                          data-error-callback="onTurnstileError"

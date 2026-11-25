@@ -160,7 +160,8 @@
             return {
                 siteKey: window.TURNSTILE_CONFIG.siteKey,
                 mode: widgetAppearance(window.TURNSTILE_CONFIG.mode),
-                theme: window.TURNSTILE_CONFIG.theme || 'auto'
+                theme: window.TURNSTILE_CONFIG.theme || 'auto',
+                action: window.TURNSTILE_CONFIG.action || null
             };
         }
 
@@ -328,6 +329,9 @@
         // Cloudflare's own mode comes from the site key; a size of 'invisible' throws for other modes
         container.setAttribute('data-size', 'flexible');
         container.setAttribute('data-appearance', config.mode === 'always' ? 'always' : 'interaction-only');
+        if (config.action) {
+            container.setAttribute('data-action', config.action);
+        }
         return container;
     }
 
@@ -375,7 +379,7 @@
             }
         };
 
-        state.widgetId = turnstileApi().render(container, {
+        var options = {
             sitekey: config.siteKey,
             theme: config.theme,
             size: container.getAttribute('data-size'),
@@ -399,7 +403,11 @@
                 logger.warn('[Turnstile] Challenge timed out');
                 lostToken();
             }
-        });
+        };
+        if (config.action) {
+            options.action = config.action;
+        }
+        state.widgetId = turnstileApi().render(container, options);
         logger.log('[Turnstile] Widget rendered');
     }
 
